@@ -1,5 +1,5 @@
 services:
-  kakfa:
+  kafka:
     image: apache/kafka:3.9.1
     hostname: kafka
     ports:
@@ -22,8 +22,8 @@ services:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
       interval: 5s
       timeout: 10s
-      retires: 30
-      state_period: 15s
+      retries: 30
+      start_period: 15s
     volumes:
       - kafka_data:/var/lib/kafka/data
   kafka-init:
@@ -59,7 +59,7 @@ services:
       KAFKA_TOPIC: platform.events
     depends_on:
       postgres: {condition: service_healthy}
-      kafka_init: {condition: service_completed_successfully}
+      kafka-init: {condition: service_completed_successfully}
     restart: unless-stopped
     deploy:
       replicas: 2
