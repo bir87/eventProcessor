@@ -6,34 +6,34 @@ CREATE TABLE IF NOT EXISTS events (
     tenant_id TEXT,
     event_type TEXT,
     schema_version TEXT,
-    occured_at TIMESTAMPZ,
+    occured_at TIMESTAMPTZ,
     payload JSONB,
     raw_payload BYTEA NOT NULL,
     validation_errors JSONB NOT NULL DEFAULT '[]'::jsonb,
+    status TEXT NOT NULL DEFAULT 'INVALID',
     routing_target TEXT,
     source_topic TEXT,
-    source_partition TEXT,
+    source_partition INT,
     source_offset BIGINT,
-    received_At TIMESTAMPZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    processed_at TIMESTAMPZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (source_topic, source_partition, source_offset)
+    received_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (source_topic, source_partition, source_offset),
+    UNIQUE (tenant_id, event_id)
 );
 
-CREATE UNIQUE_INDEX IF NOT EXISTS events_event_id_tenant_id_idx ON events (event_id, tenant_id)
-    WHERE tenant_id IS NOT NULL AND tenant_id <> ''; AND event_id IS NOT NULL AND event_id <> '';
-CREATE INDEX IF NOT EXISTS idx_events_ready ON events (tenant_id, received_at) WHERE status = 'READY';
+CREATE INDEX IF NOT EXISTS idx_events_ready ON events (tenant_id, received_at) WHERE status = 'Ready';
+CREATE INDEX IF NOT EXISTS idx_events_ready_receiver ON events (tenant_id, receiver_id, received_at) WHERE status = 'Ready';
+
 
 CREATE TABLE IF NOT EXISTS event_quarantine (
     id SERIAL PRIMARY KEY,
     source_topic TEXT,
-    source_partition TEXT,
+    source_partition INT,
     source_offset BIGINT,
     tenant_id TEXT,
     event_id TEXT,
     raw_payload BYTEA NOT NULL,
     reason TEXT NOT NULL,
-    created_at TIMESTAMPZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (source_topic, source_partition, source_offset)
 );
-
-CREATE INDEX IF NOT EXISTS idx_ready_recipient ON events (tenant_id, recipient_id, received_at) WHERE status = 'READY';
