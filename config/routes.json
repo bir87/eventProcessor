@@ -1,0 +1,28 @@
+{
+    "routes": [
+        {
+            "tenant_id": "tenant-demo",
+            "event_type": "transaction.authorized",
+            "receiver_id": "banking-app",
+            "destination": "transactions"
+        },
+        {
+            "tenant_id": "tenant-demo",
+            "event_type": "monitoring.alert",
+            "receiver_id": "operations",
+            "destination": "alerts"
+        },
+        {
+            "tenant_id": "tenant-demo",
+            "event_type": "user.created",
+            "receiver_id": "customer-app",
+            "destination": "users"
+        },
+        {
+            "tenant_id": "tenant-demo",
+            "event_type": "integration.completed",
+            "receiver_id": "integration-hub",
+            "destination": "integrations"
+        }
+    ]
+}
