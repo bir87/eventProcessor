@@ -1,0 +1,23 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["transaction_id", "amount", "currency"],
+    "properties": {
+        "transaction_id": {
+            "type": "string",
+            "minLength":1,
+            "description": "The unique identifier of the authorized transaction."
+        },
+        "amount": {
+            "type": "number",
+            "description": "The amount of the authorized transaction.",
+            "exclusiveMinimum": 0
+        },
+        "currency": {
+            "type": "string",
+            "description": "The currency of the authorized transaction.",
+            "pattern": "^[A-Z]{3}$"
+        }
+    }
+}
