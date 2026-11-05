@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS events (
     UNIQUE (tenant_id, event_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_events_ready ON events (tenant_id, received_at) WHERE status = 'Ready';
-CREATE INDEX IF NOT EXISTS idx_events_ready_receiver ON events (tenant_id, receiver_id, received_at) WHERE status = 'Ready';
+CREATE INDEX IF NOT EXISTS idx_events_ready ON events (tenant_id, received_at) WHERE status = 'READY';
+CREATE INDEX IF NOT EXISTS idx_events_ready_receiver ON events (tenant_id, receiver_id, received_at) WHERE status = 'READY';
 
 
 CREATE TABLE IF NOT EXISTS event_quarantine (
