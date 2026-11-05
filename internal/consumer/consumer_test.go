@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -89,8 +90,8 @@ func TestConsumer_CommitAfterProcessing(t *testing.T) {
 			}
 			err := c.Run(ctx)
 
-			if !errors.Is(err, tt.processErr) {
-				t.Fatalf("Run() error = %v; want %v", err, tt.processErr)
+			if err != nil {
+				t.Fatalf("Run() error = %v; want clean shutdown", err)
 			}
 
 			if calls != 1 {
@@ -111,6 +112,95 @@ func TestConsumer_CommitAfterProcessing(t *testing.T) {
 					got.Offset != reader.message.Offset {
 					t.Fatalf("committed wrong message: %+v", got)
 				}
+			}
+			if !reader.closed {
+				t.Fatal("reader was not closed")
+			}
+		})
+	}
+}
+
+func TestConsumer_RetryPolicy(t *testing.T) {
+	cause := errors.New("storage failure")
+
+	tests := []struct {
+		name        string
+		retryable   bool
+		wantCalls   int
+		wantCommits int
+	}{
+		{
+			name:        "retryable failure followed by success",
+			retryable:   true,
+			wantCalls:   2,
+			wantCommits: 1,
+		},
+		{
+			name:        "non-retryable failure stops without cancellation",
+			retryable:   false,
+			wantCalls:   1,
+			wantCommits: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(
+				context.Background(), 5*time.Second,
+			)
+			defer cancel()
+
+			reader := &fakeReader{
+				message: kafka.Message{
+					Topic:     "platform.events",
+					Partition: 0,
+					Offset:    42,
+					Value:     []byte(`{"event_id":"evt-1"}`),
+				},
+				cancel: cancel,
+			}
+			calls := 0
+			handler := handlerFunc(func(_ context.Context, _ []byte, src model.Source,
+			) (model.Record, bool, error) {
+				calls++
+				if len(reader.committed) != 0 {
+					t.Fatal("message committed before processing succeeded")
+				}
+
+				record := model.Record{Source: src}
+				if calls == 1 {
+					return record, false, &model.StorageError{
+						Err:       cause,
+						Retryable: tt.retryable,
+					}
+				}
+				return record, false, nil
+			})
+			consumer := Consumer{
+				Reader: reader, Handler: handler,
+				Logger: slog.New(
+					slog.NewTextHandler(io.Discard, nil),
+				),
+			}
+			err := consumer.Run(ctx)
+			if tt.retryable {
+				if err != nil {
+					t.Fatalf("Run() error = %v; want nil", err)
+				}
+			} else {
+				if !errors.Is(err, cause) {
+					t.Fatalf("Run() error = %v; want %v", err, cause)
+				}
+				if ctx.Err() != nil {
+					t.Fatalf("consumer stopped through cancellation: %v", ctx.Err())
+				}
+			}
+			if calls != tt.wantCalls {
+				t.Fatalf("Process calls = %d; want %d", calls, tt.wantCalls)
+			}
+			if len(reader.committed) != tt.wantCommits {
+				t.Fatalf("commits = %d; want %d",
+					len(reader.committed), tt.wantCommits,
+				)
 			}
 			if !reader.closed {
 				t.Fatal("reader was not closed")

@@ -3,7 +3,6 @@ package routing
 import (
 	"os"
 	"testing"
-	
 )
 
 func TestResolve(t *testing.T) {

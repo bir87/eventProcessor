@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 	"eventprocessor/internal/model"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -43,14 +44,11 @@ func (c *Consumer) Run(ctx context.Context) error {
 		c.Logger.Info("event received", "topic", m.Topic, "partition", m.Partition, "offset", m.Offset)
 
 		for attempt := 0; ; attempt++ {
-			workCtx := ctx
 			if ctx.Err() != nil {
-				var cancel context.CancelFunc
-				workCtx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
-				defer cancel()
+				return nil
 			}
 
-			rec, quarantined, procErr := c.Handler.Process(workCtx, m.Value, src)
+			rec, quarantined, procErr := c.Handler.Process(ctx, m.Value, src)
 			err = procErr
 			if err == nil {
 				if quarantined {
@@ -58,20 +56,27 @@ func (c *Consumer) Run(ctx context.Context) error {
 						rec.Envelope.TenantID, "event_id", rec.Envelope.EventID)
 				} else {
 					c.Logger.Info("event processed", "topic", m.Topic, "partition", m.Partition, "offset", m.Offset, "tenant_id",
-						rec.Envelope.TenantID, "event_id", rec.Envelope.EventID, "status", rec.Status, "route", rec.Route)
+						rec.Envelope.TenantID, "event_id", rec.Envelope.EventID, "status", rec.Status, "route", rec.Route, "validation_errors", rec.Errors)
 				}
 				break
 			}
 
-			c.Logger.Error("event perisitence failed; retrying",
+			if ctx.Err() != nil {
+				return nil
+			}
+
+			if !model.IsRetryable(err) {
+				return fmt.Errorf(
+					"non-retryable processing failure at %s/%d/%d: %w",
+					m.Topic, m.Partition, m.Offset, err,
+				)
+			}
+
+			c.Logger.Error("event persistence failed; retrying",
 				"topic", m.Topic, "partition", m.Partition,
 				"offset", m.Offset, "tenant_id", rec.Envelope.TenantID,
 				"event_id", rec.Envelope.EventID,
 				"attempt", attempt+1, "error", err)
-
-			if ctx.Err() != nil {
-				return err
-			}
 			delay := time.Duration(1<<min(attempt, 5)) * time.Second
 
 			select {
