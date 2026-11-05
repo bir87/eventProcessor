@@ -71,12 +71,19 @@ Postgres provides tranasctions, indexes and unique constanints.latency, idempten
 - Duplicate Delivery: Unqiue constraints on kafka topic/partition/offset, tenant and event IDs prevent duplicat rows. Reprocess does not insert another row.
 - Conflicting events: same tenant/event ID with different bytes is quarantined.
 - Shutdown: in flight processing in cancelled, unack message replay after restart.
+- Crash before db commit : offset is uncommited, event can replay after restart.
+- Crash after db commit but before kafka ack : the stored event remains avaialble. Replay is handled through idempotent persistnce.
+- Invalid schema: Startup fails with an error with invalid config
+- Duplicate event: Unique constraints and duplicate checks prevent another row.
 
 ## Known Limitations
-
-- Single Consumer group, no partion-key stragey on producers, we use a `tenant-demo` fixed key.
+- Demo uses 1 kafka broker and 1 db instnace so it does not provide high availability or database failover.
+- Removing docker volumes or `make clean` can delete the persisted data.
+- Single Consumer group, no partion-key stragey on producers, it uses a `tenant-demo` fixed key.
+- Each consumer proceess one message at a time, processing does not use db batching. 
+- Envelope validation rejects unknow fields, so adding envelope fields requires a processor update.
 - Routing is satic, loaded on starup.
-- No kafka dead-letter topic.
+- No kafka dead-letter topic, hence quarantined messages are stored in db, and there is no automated replay workflow.
 - Schema compilcation is per-file and loaded at startup.
 - No Delivery Service ( out of scope )
 
